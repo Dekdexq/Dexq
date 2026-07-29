@@ -78,21 +78,35 @@ MainTab:Toggle({
                 
                 -- Maximum speed spawn loop with dynamic brake threshold to prevent conveyor belt overflow
                 while getgenv().AutoSpawnPack do
-                    pcall(fireclickdetector, cd)
-                    
                     local activeCards = 0
                     if getgenv().CardFolder then
                         for _, model in ipairs(getgenv().CardFolder:GetChildren()) do
                             if model:IsA("Model") and model:GetAttribute("IgnoreTutoBeam") ~= nil and model:FindFirstChildWhichIsA("ProximityPrompt", true) then
+                                -- Ignore cards that have been checked and rejected by the buy loop
+                                if getgenv().AutoBuyCards and model:GetAttribute("Rejected") then
+                                    continue
+                                end
                                 activeCards = activeCards + 1
                             end
                         end
                     end
                     
-                    if activeCards >= 3 then
-                        task.wait(0.2) 
+                    if getgenv().AutoBuyCards then
+                        -- Strict 1-by-1 logic when buying
+                        if activeCards == 0 then
+                            pcall(fireclickdetector, cd)
+                            task.wait(0.3) 
+                        else
+                            task.wait(0.05) 
+                        end
                     else
-                        task.wait(0.01) 
+                        -- Fast spam logic when just afk spawning (with a small brake)
+                        pcall(fireclickdetector, cd)
+                        if activeCards >= 3 then
+                            task.wait(0.2)
+                        else
+                            task.wait(0.01)
+                        end
                     end
                 end
             end)
@@ -235,6 +249,9 @@ local function instantBuyLoop()
                             fireproximityprompt(prompt)
                         end)
                     end
+                else
+                    -- Mark the card as rejected so the spawner doesn't wait for it
+                    model:SetAttribute("Rejected", true)
                 end
             end
         end
