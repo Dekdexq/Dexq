@@ -270,6 +270,28 @@ MainTab:Toggle({
     end
 })
 
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local antiAfkConnection
+
+MainTab:Toggle({
+    Title = "Anti AFK",
+    Desc = "Prevents you from being kicked for idling (20 mins)",
+    Callback = function(state)
+        if state then
+            antiAfkConnection = Players.LocalPlayer.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        else
+            if antiAfkConnection then
+                antiAfkConnection:Disconnect()
+                antiAfkConnection = nil
+            end
+        end
+    end
+})
+
 WindUI:Notify({
     Title = "Dexq Loaded",
     Content = "loaded successfully",
