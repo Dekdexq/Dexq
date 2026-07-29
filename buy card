@@ -1,0 +1,260 @@
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "Dexq",
+    Icon = "solar:box-minimalistic-bold",
+    Author = "Anime Card Farm",
+    Folder = "DexqUI",
+    Size = UDim2.fromOffset(580, 420),
+    Transparent = true,
+    Theme = "Dark", 
+    HideSearchBar = true,
+    OpenButton = {
+        Title = "Open Dexq",
+        CornerRadius = UDim.new(1, 0),
+        StrokeThickness = 2,
+        Enabled = true,
+        Draggable = true,
+        Scale = 0.8,
+        Color = ColorSequence.new(
+            Color3.fromHex("#8c3cff"),
+            Color3.fromHex("#5523a8")
+        )
+    }
+})
+
+local MainTab = Window:Tab({
+    Title = "Main",
+    Icon = "solar:home-bold",
+})
+
+local FilterConfig = {
+    EnableRarityFilter = false,
+    EnableMutationFilter = false,
+    BuyRarities = {},
+    BuyMutations = {}
+}
+
+local function getSpawnPackClickDetector()
+    local player = game:GetService("Players").LocalPlayer
+    local plotNum = player:FindFirstChild("PlotNumber") and player.PlotNumber.Value or 0
+    if plotNum ~= 0 then
+        local plotFolder = workspace:FindFirstChild("MAP") 
+            and workspace.MAP:FindFirstChild("Plots") 
+            and workspace.MAP.Plots:FindFirstChild(tostring(plotNum))
+        
+        if plotFolder and plotFolder:FindFirstChild("Plot_N0") then
+            -- Find the spawn button within the player's plot
+            for _, v in ipairs(plotFolder.Plot_N0:GetDescendants()) do
+                if v:IsA("ClickDetector") and v.Parent.Name == "ButtonPart" then
+                    return v
+                end
+            end
+        end
+    end
+    -- Fallback to the first found plot if player's plot cannot be identified
+    for _, desc in ipairs(workspace:GetDescendants()) do
+        if desc:IsA("ClickDetector") and desc.Parent and desc.Parent.Name == "ButtonPart" and desc.Parent.Parent and desc.Parent.Parent.Name == "Plot_N0" then
+            return desc
+        end
+    end
+    return nil
+end
+
+getgenv().AutoSpawnPack = false
+MainTab:Toggle({
+    Title = "Auto Spawn Pack",
+    Desc = "Spawns packs as fast as the game allows",
+    Callback = function(state)
+        getgenv().AutoSpawnPack = state
+        if state then
+            task.spawn(function()
+                local cd = getSpawnPackClickDetector()
+                if not cd then
+                    WindUI:Notify({ Title = "Error", Content = "Spawn Pack button not found!", Duration = 3 })
+                    getgenv().AutoSpawnPack = false
+                    return
+                end
+                
+                -- Maximum speed spawn loop with dynamic brake threshold to prevent conveyor belt overflow
+                while getgenv().AutoSpawnPack do
+                    pcall(fireclickdetector, cd)
+                    
+                    local activeCards = 0
+                    if getgenv().CardFolder then
+                        for _, model in ipairs(getgenv().CardFolder:GetChildren()) do
+                            if model:IsA("Model") and model:GetAttribute("IgnoreTutoBeam") ~= nil and model:FindFirstChildWhichIsA("ProximityPrompt", true) then
+                                activeCards = activeCards + 1
+                            end
+                        end
+                    end
+                    
+                    if activeCards >= 3 then
+                        task.wait(0.2) 
+                    else
+                        task.wait(0.01) 
+                    end
+                end
+            end)
+        end
+    end
+})
+
+local RaritiesList = {
+    "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret", "Divine",
+    "Transcendent", "Shadow", "Emperor", "Demon", "Manga", "Celestial", "Heavenly",
+    "Corrupted", "Striker", "Sacred", "Paradox", "Founder", "Evolved", "Magic", "Oni",
+    "Chaos", "Ruin", "Reborn", "Beast", "Nordic", "Hunter", "Soul", "Swordsman",
+    "Gamer", "Revenge", "Chainsaw", "Eternity", "Academy", "Dynasty", "Grail",
+    "Mystery", "VIP", "Event", "Limited"
+}
+
+getgenv().SelectedRarities = {}
+
+MainTab:Dropdown({
+    Title = "Select Rarities to Buy",
+    Multi = true,
+    Values = RaritiesList,
+    Value = {},
+    Callback = function(value)
+        getgenv().SelectedRarities = {}
+        if type(value) == "table" then
+            for k, v in pairs(value) do
+                if type(k) == "number" then
+                    getgenv().SelectedRarities[string.lower(tostring(v))] = true
+                else
+                    getgenv().SelectedRarities[string.lower(tostring(k))] = v
+                end
+            end
+        elseif type(value) == "string" then
+            getgenv().SelectedRarities[string.lower(value)] = true
+        end
+    end
+})
+
+local MutationsList = {
+    "Normal", "Golden", "Diamond", "Venomous", "Rainbow", "Sakura", "Candy",
+    "Blessed", "Radioactive", "Glitch", "Starfallen", "Admin"
+}
+
+getgenv().SelectedMutations = {}
+
+MainTab:Dropdown({
+    Title = "Select Mutations to Buy",
+    Multi = true,
+    Values = MutationsList,
+    Value = {},
+    Callback = function(value)
+        getgenv().SelectedMutations = {}
+        if type(value) == "table" then
+            for k, v in pairs(value) do
+                if type(k) == "number" then
+                    getgenv().SelectedMutations[string.lower(tostring(v))] = true
+                else
+                    getgenv().SelectedMutations[string.lower(tostring(k))] = v
+                end
+            end
+        elseif type(value) == "string" then
+            getgenv().SelectedMutations[string.lower(value)] = true
+        end
+    end
+})
+
+getgenv().CardFolder = getgenv().CardFolder or nil
+getgenv().PromptCooldowns = getgenv().PromptCooldowns or {}
+
+local RunService = game:GetService("RunService")
+
+-- Find the workspace folder containing all spawned cards
+local function findCardFolder()
+    for _, desc in ipairs(workspace:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            local model = desc:FindFirstAncestorOfClass("Model")
+            if model and model:GetAttribute("IgnoreTutoBeam") ~= nil then
+                getgenv().CardFolder = model.Parent
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Main heartbeat loop targeting ProximityPrompts instantly without queue delays
+local function instantBuyLoop()
+    if not getgenv().AutoBuyCards then return end
+    
+    if not getgenv().CardFolder then
+        findCardFolder()
+    end
+    if not getgenv().CardFolder then return end
+
+    -- Scan for new target cards on the conveyor belt
+    for _, model in ipairs(getgenv().CardFolder:GetChildren()) do
+        if not model:IsA("Model") or model:GetAttribute("IgnoreTutoBeam") == nil then continue end
+        
+        local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if not prompt then continue end
+
+        local rarityLabel = model:FindFirstChild("Rarity", true)
+        local mutationLabel = model:FindFirstChild("Mutation", true)
+        
+        if rarityLabel then
+            -- Strip RichText tags (<font color=...>) to ensure accurate string matching
+            local cleanRarityText = string.gsub(rarityLabel.Text, "<[^>]+>", "")
+            local cardRarity = string.match(cleanRarityText, "^%s*(.-)%s*$") or ""
+            if cardRarity ~= "" and cardRarity ~= "Label" then
+                
+                local cardMutation = "Normal"
+                if mutationLabel then
+                    local cleanMutationText = string.gsub(mutationLabel.Text, "<[^>]+>", "")
+                    local mText = string.match(cleanMutationText, "^%s*(.-)%s*$") or ""
+                    if mText ~= "" and mText ~= "Label" then
+                        cardMutation = mText
+                    end
+                end
+                
+                local matchRarity = true
+                if next(getgenv().SelectedRarities) ~= nil then
+                    matchRarity = (getgenv().SelectedRarities[string.lower(cardRarity)] == true)
+                end
+                
+                local matchMutation = true
+                if next(getgenv().SelectedMutations) ~= nil then
+                    matchMutation = (getgenv().SelectedMutations[string.lower(cardMutation)] == true)
+                end
+                
+                if matchRarity and matchMutation then
+                    -- Mass-spam interactions with a 0.05s internal throttle per prompt to bypass rate limits
+                    local now = tick()
+                    if not getgenv().PromptCooldowns[prompt] or now - getgenv().PromptCooldowns[prompt] > 0.05 then
+                        getgenv().PromptCooldowns[prompt] = now
+                        
+                        pcall(function()
+                            prompt.RequiresLineOfSight = false
+                            prompt.MaxActivationDistance = 99999
+                            fireproximityprompt(prompt)
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end
+
+if getgenv().BruteForceLoop then getgenv().BruteForceLoop:Disconnect() end
+getgenv().BruteForceLoop = RunService.Heartbeat:Connect(instantBuyLoop)
+
+getgenv().AutoBuyCards = false
+MainTab:Toggle({
+    Title = "Buy Selected Now",
+    Desc = "Automatically buys matching cards",
+    Callback = function(state)
+        getgenv().AutoBuyCards = state
+    end
+})
+
+WindUI:Notify({
+    Title = "Dexq Loaded",
+    Content = "loaded successfully",
+    Duration = 5,
+})
