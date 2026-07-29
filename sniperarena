@@ -1,0 +1,241 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local player = Players.LocalPlayer
+
+-- ==========================================
+-- Settings
+-- ==========================================
+local Settings = {
+    ESPEnabled = false
+}
+
+-- ==========================================
+-- UI Creation
+-- ==========================================
+local UI = Instance.new("ScreenGui")
+UI.Name = "Dexq"
+UI.ResetOnSpawn = false
+
+local success, coreGui = pcall(function() return game:GetService("CoreGui") end)
+UI.Parent = success and coreGui or player:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 400, 0, 110)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -55)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = UI
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.BorderSizePixel = 0
+Title.Text = "Dexq"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local TitlePadding = Instance.new("UIPadding")
+TitlePadding.PaddingLeft = UDim.new(0, 15)
+TitlePadding.Parent = Title
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+local TitleExtension = Instance.new("Frame")
+TitleExtension.Size = UDim2.new(1, 0, 0, 8)
+TitleExtension.Position = UDim2.new(0, 0, 1, -8)
+TitleExtension.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TitleExtension.BorderSizePixel = 0
+TitleExtension.Parent = Title
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Name = "CloseBtn"
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 14
+CloseBtn.Parent = MainFrame
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Name = "MinimizeBtn"
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -70, 0, 5)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 16
+MinimizeBtn.Parent = MainFrame
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 6)
+MinimizeCorner.Parent = MinimizeBtn
+
+local Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.Size = UDim2.new(1, -30, 1, -60)
+Content.Position = UDim2.new(0, 15, 0, 50)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = Content
+
+-- ==========================================
+-- Toggle Functions
+-- ==========================================
+local function createToggle(name, text, defaultValue, callback)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Size = UDim2.new(1, 0, 0, 45)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.Text = text .. ": " .. (defaultValue and "ON" or "OFF")
+    btn.TextColor3 = defaultValue and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 16
+    btn.Parent = Content
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    local state = defaultValue
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = text .. ": " .. (state and "ON" or "OFF")
+        btn.TextColor3 = state and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+        callback(state)
+    end)
+    return btn
+end
+
+-- ==========================================
+-- UI Events
+-- ==========================================
+local isMinimized = false
+local originalSize = MainFrame.Size
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        MainFrame.Size = UDim2.new(0, 400, 0, 40)
+        TitleExtension.Visible = false
+        Content.Visible = false
+        MinimizeBtn.Text = "+"
+    else
+        MainFrame.Size = originalSize
+        TitleExtension.Visible = true
+        Content.Visible = true
+        MinimizeBtn.Text = "-"
+    end
+end)
+
+
+CloseBtn.MouseButton1Click:Connect(function()
+    UI:Destroy()
+    if tracerGui then
+        tracerGui:Destroy()
+    end
+end)
+
+-- ==========================================
+-- Logic: ESP
+-- ==========================================
+local tracerGui = Instance.new("ScreenGui")
+tracerGui.Name = "ESP_Tracers"
+tracerGui.ResetOnSpawn = false
+tracerGui.IgnoreGuiInset = true
+tracerGui.Parent = UI.Parent
+
+local tracers = {}
+
+local function createTracer(targetPlayer)
+    if targetPlayer == player then return end
+    local line = Instance.new("Frame")
+    line.Name = targetPlayer.Name .. "_Tracer"
+    line.AnchorPoint = Vector2.new(0.5, 0.5)
+    line.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    line.BorderSizePixel = 0
+    line.Visible = false
+    line.Parent = tracerGui
+    tracers[targetPlayer] = line
+end
+
+local function removeTracer(targetPlayer)
+    if tracers[targetPlayer] then
+        tracers[targetPlayer]:Destroy()
+        tracers[targetPlayer] = nil
+    end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    createTracer(p)
+end
+Players.PlayerAdded:Connect(createTracer)
+Players.PlayerRemoving:Connect(removeTracer)
+
+createToggle("ESPToggle", "ESP Tracers", Settings.ESPEnabled, function(state)
+    Settings.ESPEnabled = state
+    if not state then
+        for _, line in pairs(tracers) do
+            line.Visible = false
+        end
+    end
+end)
+
+-- ==========================================
+-- RenderStepped Loop (For ESP)
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+    -- ESP Logic
+    if Settings.ESPEnabled then
+        for targetPlayer, line in pairs(tracers) do
+            local character = targetPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") and character.Humanoid.Health > 0 then
+                local rootPart = character.HumanoidRootPart
+                local vector, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                
+                if onScreen then
+                    local startPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    local endPos = Vector2.new(vector.X, vector.Y)
+                    
+                    local distance = (endPos - startPos).Magnitude
+                    local center = (startPos + endPos) / 2
+                    local angle = math.deg(math.atan2(endPos.Y - startPos.Y, endPos.X - startPos.X))
+                    
+                    line.Position = UDim2.new(0, center.X, 0, center.Y)
+                    line.Size = UDim2.new(0, distance, 0, 2)
+                    line.Rotation = angle
+                    line.Visible = true
+                else
+                    line.Visible = false
+                end
+            else
+                line.Visible = false
+            end
+        end
+    end
+end)
