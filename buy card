@@ -148,7 +148,7 @@ MainTab:Dropdown({
 
 local MutationsList = {
     "Normal", "Golden", "Diamond", "Venomous", "Rainbow", "Sakura", "Candy",
-    "Blessed", "Radioactive", "Glitch", "Starfallen", "Admin"
+    "Blessed", "Radioactive", "Glitch", "Starfallen", "Admin", "Unknow"
 }
 
 getgenv().SelectedMutations = {}
@@ -291,6 +291,197 @@ MainTab:Toggle({
         end
     end
 })
+
+local MiscTab = Window:Tab({
+    Title = "Misc",
+    Icon = "solar:settings-bold",
+})
+
+local HttpService = game:GetService("HttpService")
+local ConfigFolder = "Dexq_AnimeCardFarm"
+
+if not isfolder(ConfigFolder) then
+    pcall(makefolder, ConfigFolder)
+end
+
+local function GetConfigs()
+    local configs = {}
+    if isfolder(ConfigFolder) then
+        for _, file in ipairs(listfiles(ConfigFolder)) do
+            if file:sub(-5) == ".json" and not file:find("_MainConfig.json") then
+                local name = file:match("([^/\\]+)%.json$")
+                if name then table.insert(configs, name) end
+            end
+        end
+    end
+    return configs
+end
+
+local ConfigData = {
+    Autoload = "",
+}
+
+local function SaveMainConfig()
+    if writefile then
+        pcall(function()
+            writefile(ConfigFolder .. "/_MainConfig.json", HttpService:JSONEncode(ConfigData))
+        end)
+    end
+end
+
+local function LoadMainConfig()
+    if isfile and isfile(ConfigFolder .. "/_MainConfig.json") then
+        local s, r = pcall(function()
+            return HttpService:JSONDecode(readfile(ConfigFolder .. "/_MainConfig.json"))
+        end)
+        if s and type(r) == "table" then
+            ConfigData = r
+        end
+    end
+end
+LoadMainConfig()
+
+MiscTab:Keybind({
+    Title = "Toggle UI Key",
+    Desc = "Press to hide or show the menu",
+    Key = "RightControl",
+    Callback = function()
+        pcall(function()
+            local toggled = false
+            if Window and type(Window.Toggle) == "function" then
+                Window:Toggle()
+                toggled = true
+            end
+            if not toggled then
+                for _, v in ipairs(game:GetService("CoreGui"):GetChildren()) do
+                    if v:IsA("ScreenGui") and v:FindFirstChild("Main") and v.Main:IsA("Frame") then
+                        -- Check if this is the WindUI ScreenGui
+                        local titleLabel = v.Main:FindFirstChild("Topbar", true)
+                        if titleLabel or v.Name == "WindUI" or v.Name == "DexqUI" then
+                            v.Enabled = not v.Enabled
+                        end
+                    end
+                end
+            end
+        end)
+    end
+})
+
+local function SaveConfig(name)
+    local data = {
+        Rarities = getgenv().SelectedRarities or {},
+        Mutations = getgenv().SelectedMutations or {}
+    }
+    if writefile then
+        pcall(function()
+            writefile(ConfigFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data))
+            WindUI:Notify({ Title = "Config", Content = "Saved config: " .. name, Duration = 3 })
+        end)
+    end
+end
+
+local function LoadConfig(name)
+    if isfile and isfile(ConfigFolder .. "/" .. name .. ".json") then
+        local s, data = pcall(function()
+            return HttpService:JSONDecode(readfile(ConfigFolder .. "/" .. name .. ".json"))
+        end)
+        if s and type(data) == "table" then
+            getgenv().SelectedRarities = data.Rarities or {}
+            getgenv().SelectedMutations = data.Mutations or {}
+            WindUI:Notify({ Title = "Config", Content = "Loaded config: " .. name, Duration = 3 })
+        else
+            WindUI:Notify({ Title = "Config", Content = "Failed to load config: " .. name, Duration = 3 })
+        end
+    end
+end
+
+local ConfigNameInput = ""
+MiscTab:Input({
+    Title = "Config Name",
+    Desc = "Enter name for new config",
+    PlaceholderText = "Config name...",
+    Callback = function(text)
+        ConfigNameInput = text
+    end
+})
+
+local ConfigDropdown -- declare beforehand
+
+MiscTab:Button({
+    Title = "Save Config",
+    Callback = function()
+        if ConfigNameInput ~= "" then
+            SaveConfig(ConfigNameInput)
+            if ConfigDropdown and ConfigDropdown.Refresh then
+                pcall(function() ConfigDropdown:Refresh(GetConfigs()) end)
+            end
+        else
+            WindUI:Notify({ Title = "Config", Content = "Please enter a config name", Duration = 3 })
+        end
+    end
+})
+
+local ConfigList = GetConfigs()
+local SelectedConfig = ConfigData.Autoload
+
+ConfigDropdown = MiscTab:Dropdown({
+    Title = "Saved Configs",
+    Values = ConfigList,
+    Value = ConfigData.Autoload,
+    Callback = function(value)
+        if type(value) == "table" then
+            for k, v in pairs(value) do
+                if type(k) == "number" then
+                    SelectedConfig = v
+                else
+                    SelectedConfig = k
+                end
+            end
+        else
+            SelectedConfig = value
+        end
+    end
+})
+
+MiscTab:Button({
+    Title = "Refresh Config List",
+    Callback = function()
+        if ConfigDropdown and ConfigDropdown.Refresh then
+            pcall(function() ConfigDropdown:Refresh(GetConfigs()) end)
+        end
+        WindUI:Notify({ Title = "Config", Content = "Config list refreshed", Duration = 3 })
+    end
+})
+
+MiscTab:Button({
+    Title = "Load Selected Config",
+    Callback = function()
+        if SelectedConfig and SelectedConfig ~= "" then
+            LoadConfig(SelectedConfig)
+        end
+    end
+})
+
+MiscTab:Toggle({
+    Title = "Auto Load Selected Config",
+    Desc = "Automatically loads this config on execution",
+    Value = (ConfigData.Autoload ~= ""),
+    Callback = function(state)
+        if state then
+            ConfigData.Autoload = SelectedConfig
+        else
+            ConfigData.Autoload = ""
+        end
+        SaveMainConfig()
+    end
+})
+
+if ConfigData.Autoload ~= "" then
+    task.spawn(function()
+        task.wait(1)
+        LoadConfig(ConfigData.Autoload)
+    end)
+end
 
 WindUI:Notify({
     Title = "Dexq Loaded",
