@@ -2,10 +2,9 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 
 local Window = WindUI:CreateWindow({
     Title = "Dexq",
-    Icon = "solar:box-minimalistic-bold",
     Author = "Anime Card Farm",
     Folder = "DexqUI",
-    Size = UDim2.fromOffset(580, 420),
+    Size = UDim2.fromOffset(480, 310),
     Transparent = true,
     Theme = "Dark", 
     HideSearchBar = true,
@@ -64,7 +63,6 @@ end
 getgenv().AutoSpawnPack = false
 local AutoSpawnToggle = MainTab:Toggle({
     Title = "Auto Spawn Pack",
-    Desc = "Spawns packs as fast as the game allows",
     Callback = function(state)
         getgenv().AutoSpawnPack = state
         if state then
@@ -315,9 +313,164 @@ getgenv().BruteForceLoop = RunService.Heartbeat:Connect(instantBuyLoop)
 getgenv().AutoBuyCards = false
 local AutoBuyToggle = MainTab:Toggle({
     Title = "Buy Selected Now",
-    Desc = "Automatically buys matching cards",
     Callback = function(state)
         getgenv().AutoBuyCards = state
+    end
+})
+
+getgenv().AutoCarry = false
+getgenv().AutoCarryDelay = 5
+
+local AutoCarryToggle = MainTab:Toggle({
+    Title = "Auto Carry (Collect Money)",
+    Callback = function(state)
+        getgenv().AutoCarry = state
+        if state then
+            task.spawn(function()
+                while getgenv().AutoCarry do
+                    local player = game:GetService("Players").LocalPlayer
+                    local character = player.Character
+                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                    
+                    local searchArea = workspace
+                    local plotNum = player:FindFirstChild("PlotNumber") and player.PlotNumber.Value or 0
+                    if plotNum ~= 0 then
+                        local plotFolder = workspace:FindFirstChild("MAP") 
+                            and workspace.MAP:FindFirstChild("Plots") 
+                            and workspace.MAP.Plots:FindFirstChild(tostring(plotNum))
+                        if plotFolder then searchArea = plotFolder end
+                    end
+                    
+                    for _, prompt in ipairs(searchArea:GetDescendants()) do
+                        if prompt:IsA("ProximityPrompt") then
+                            local txt = (prompt.ActionText .. " " .. prompt.ObjectText .. " " .. prompt.Name):lower()
+                            if txt:find("carry") then
+                                pcall(function()
+                                    local targetPos
+                                    if prompt.Parent:IsA("BasePart") then targetPos = prompt.Parent.Position
+                                    elseif prompt.Parent:IsA("Attachment") then targetPos = prompt.Parent.WorldPosition
+                                    elseif prompt.Parent:IsA("Model") and prompt.Parent.PrimaryPart then targetPos = prompt.Parent.PrimaryPart.Position end
+                                    
+                                    local originalCFrame
+                                    if hrp and targetPos then
+                                        originalCFrame = hrp.CFrame
+                                        hrp.CFrame = CFrame.new(targetPos) + Vector3.new(0, 3, 0)
+                                        task.wait(0.2)
+                                    end
+                                    
+                                    prompt.RequiresLineOfSight = false
+                                    prompt.MaxActivationDistance = 99999
+                                    fireproximityprompt(prompt)
+                                    task.wait(0.1)
+                                    
+                                    if originalCFrame then hrp.CFrame = originalCFrame end
+                                end)
+                            end
+                        end
+                    end
+                    
+                    local delayTime = tonumber(getgenv().AutoCarryDelay) or 5
+                    if delayTime < 1 then delayTime = 1 end
+                    
+                    local elapsed = 0
+                    while getgenv().AutoCarry and elapsed < (delayTime * 60) do
+                        task.wait(1)
+                        elapsed = elapsed + 1
+                    end
+                    task.wait(1) -- Safety yield
+                end
+            end)
+        end
+    end
+})
+
+getgenv().AutoSellBox = false
+local AutoSellBoxToggle = MainTab:Toggle({
+    Title = "Auto Sell Box",
+    Callback = function(state)
+        getgenv().AutoSellBox = state
+        if state then
+            task.spawn(function()
+                while getgenv().AutoSellBox do
+                    local player = game:GetService("Players").LocalPlayer
+                    local character = player.Character
+                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                    
+                    -- Find Box in Backpack
+                    local backpack = player:FindFirstChild("Backpack")
+                    local boxTool = nil
+                    
+                    if backpack then
+                        for _, tool in ipairs(backpack:GetChildren()) do
+                            if tool:IsA("Tool") and (tool:GetAttribute("BoxValue") ~= nil or tool.Name:find("Box")) then
+                                boxTool = tool
+                                break
+                            end
+                        end
+                    end
+                    
+                    -- Equip it if found in backpack
+                    if boxTool and character and character:FindFirstChild("Humanoid") then
+                        character.Humanoid:EquipTool(boxTool)
+                        task.wait(0.2)
+                    end
+                    
+                    -- If it's equipped in Character, teleport and fire the SellPart prompt
+                    local isEquipped = false
+                    if character then
+                        for _, tool in ipairs(character:GetChildren()) do
+                            if tool:IsA("Tool") and (tool:GetAttribute("BoxValue") ~= nil or tool.Name:find("Box")) then
+                                isEquipped = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    if isEquipped and hrp then
+                        local plotNum = player:FindFirstChild("PlotNumber") and player.PlotNumber.Value or 0
+                        if plotNum ~= 0 then
+                            local plotFolder = workspace:FindFirstChild("MAP") 
+                                and workspace.MAP:FindFirstChild("Plots") 
+                                and workspace.MAP.Plots:FindFirstChild(tostring(plotNum))
+                            
+                            if plotFolder and plotFolder:FindFirstChild("Plot_N0") and plotFolder.Plot_N0:FindFirstChild("SellPart") then
+                                local sellPart = plotFolder.Plot_N0.SellPart
+                                local prompt = sellPart:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt then
+                                    pcall(function()
+                                        local originalCFrame = hrp.CFrame
+                                        hrp.CFrame = sellPart.CFrame + Vector3.new(0, 3, 0)
+                                        task.wait(0.15)
+                                        
+                                        prompt.RequiresLineOfSight = false
+                                        prompt.MaxActivationDistance = 99999
+                                        fireproximityprompt(prompt)
+                                        task.wait(0.1)
+                                        
+                                        hrp.CFrame = originalCFrame
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                    
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+local AutoCarrySlider = MainTab:Slider({
+    Title = "Auto Carry Delay (Minutes)",
+    Step = 1,
+    Value = {
+        Min = 1,
+        Max = 30,
+        Default = getgenv().AutoCarryDelay or 5
+    },
+    Callback = function(value)
+        getgenv().AutoCarryDelay = value
     end
 })
 
@@ -328,7 +481,6 @@ local antiAfkConnection
 getgenv().AntiAfkState = false
 local AntiAfkToggle = MainTab:Toggle({
     Title = "Anti AFK",
-    Desc = "Prevents you from being kicked for idling (20 mins)",
     Callback = function(state)
         getgenv().AntiAfkState = state
         if state then
@@ -397,7 +549,6 @@ end
 getgenv().AutoUseLuck = false
 local AutoUseLuckToggle = MainTab:Toggle({
     Title = "Auto Use Luck Potion",
-    Desc = "Checks amounts and prioritizes Luck III -> II -> I",
     Value = getgenv().AutoUseLuck,
     Callback = function(state)
         getgenv().AutoUseLuck = state
@@ -436,7 +587,6 @@ local AutoUseLuckToggle = MainTab:Toggle({
         end
     end
 })
-
 local MiscTab = Window:Tab({
     Title = "Misc",
     Icon = "solar:settings-bold",
@@ -489,7 +639,6 @@ LoadMainConfig()
 getgenv().DiscordWebhook = ""
 local WebhookInput = MiscTab:Input({
     Title = "Discord Webhook URL",
-    Desc = "Enter your webhook URL to get notifications when a card is bought",
     PlaceholderText = "https://discord.com/api/webhooks/...",
     Callback = function(text)
         getgenv().DiscordWebhook = text
@@ -498,7 +647,6 @@ local WebhookInput = MiscTab:Input({
 
 MiscTab:Keybind({
     Title = "Toggle UI Key",
-    Desc = "Press to hide or show the menu",
     Key = "RightControl",
     Callback = function()
         pcall(function()
@@ -528,6 +676,9 @@ local function SaveConfig(name)
         Mutations = getgenv().SelectedMutations or {},
         AutoSpawn = getgenv().AutoSpawnPack or false,
         AutoBuy = getgenv().AutoBuyCards or false,
+        AutoCarry = getgenv().AutoCarry or false,
+        AutoSellBox = getgenv().AutoSellBox or false,
+        AutoCarryDelay = getgenv().AutoCarryDelay or 5,
         AntiAfk = getgenv().AntiAfkState or false,
         AutoUseLuck = getgenv().AutoUseLuck or false,
         Webhook = getgenv().DiscordWebhook or ""
@@ -558,6 +709,13 @@ local function LoadConfig(name)
             
             safeToggleSet(AutoSpawnToggle, data.AutoSpawn or false)
             safeToggleSet(AutoBuyToggle, data.AutoBuy or false)
+            safeToggleSet(AutoCarryToggle, data.AutoCarry or false)
+            safeToggleSet(AutoSellBoxToggle, data.AutoSellBox or false)
+            if data.AutoCarryDelay then
+                getgenv().AutoCarryDelay = data.AutoCarryDelay
+                pcall(function() AutoCarrySlider:SetValue(data.AutoCarryDelay) end)
+                pcall(function() AutoCarrySlider:Set(data.AutoCarryDelay) end)
+            end
             safeToggleSet(AntiAfkToggle, data.AntiAfk or false)
             safeToggleSet(AutoUseLuckToggle, data.AutoUseLuck or false)
             
@@ -609,7 +767,6 @@ end
 local ConfigNameInput = ""
 MiscTab:Input({
     Title = "Config Name",
-    Desc = "Enter name for new config",
     PlaceholderText = "Config name...",
     Callback = function(text)
         ConfigNameInput = text
@@ -697,7 +854,6 @@ MiscTab:Button({
 
 MiscTab:Toggle({
     Title = "Auto Load Selected Config",
-    Desc = "Automatically loads this config on execution",
     Value = (ConfigData.Autoload ~= ""),
     Callback = function(state)
         if state then
