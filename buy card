@@ -316,10 +316,37 @@ local function isLuckBoostActive()
     return true
 end
 
+local function getPotionAmount(potionId)
+    local PlayerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+    if not PlayerGui then return 0 end
+    local GuiMid = PlayerGui:FindFirstChild("GuiMid")
+    if not GuiMid then return 0 end
+    local Items = GuiMid:FindFirstChild("Items")
+    if not Items then return 0 end
+    local ItemsFrame = Items:FindFirstChild("ItemsFrame")
+    if not ItemsFrame then return 0 end
+    local ScrollingFrameItems = ItemsFrame:FindFirstChild("ScrollingFrameItems")
+    if not ScrollingFrameItems then return 0 end
+    
+    local ObjectFrame = ScrollingFrameItems:FindFirstChild("ObjectFrame_" .. potionId)
+    if not ObjectFrame then return 0 end
+    
+    if not ObjectFrame.Visible then return 0 end
+    
+    local ObjectButton = ObjectFrame:FindFirstChild("ObjectButton")
+    if not ObjectButton then return 0 end
+    
+    local Quantity = ObjectButton:FindFirstChild("Quantity")
+    if not Quantity or not Quantity:IsA("TextLabel") then return 0 end
+    
+    local amountStr = Quantity.Text:gsub("x", "")
+    return tonumber(amountStr) or 0
+end
+
 getgenv().AutoUseLuck = false
 local AutoUseLuckToggle = MainTab:Toggle({
     Title = "Auto Use Luck Potion",
-    Desc = "Uses Luck I, II, or III automatically (Prioritizes I)",
+    Desc = "Checks amounts and prioritizes Luck III -> II -> I",
     Value = getgenv().AutoUseLuck,
     Callback = function(state)
         getgenv().AutoUseLuck = state
@@ -331,14 +358,25 @@ local AutoUseLuckToggle = MainTab:Toggle({
                 
                 while getgenv().AutoUseLuck do
                     if not isLuckBoostActive() then
-                        ItemsRE:FireServer("UseItem", {ItemId = "LuckPotion1", Amount = 1})
-                        task.wait(0.5)
-                        if getgenv().AutoUseLuck and not isLuckBoostActive() then
-                            ItemsRE:FireServer("UseItem", {ItemId = "LuckPotion2", Amount = 1})
-                            task.wait(0.5)
-                            if getgenv().AutoUseLuck and not isLuckBoostActive() then
-                                ItemsRE:FireServer("UseItem", {ItemId = "LuckPotion3", Amount = 1})
-                            end
+                        local amt1 = getPotionAmount("LuckPotion1")
+                        local amt2 = getPotionAmount("LuckPotion2")
+                        local amt3 = getPotionAmount("LuckPotion3")
+                        
+                        -- Notify current inventory
+                        if WindUI and WindUI.Notify then
+                            WindUI:Notify({
+                                Title = "Luck Inventory Check",
+                                Content = string.format("Remaining - III: %d | II: %d | I: %d", amt3, amt2, amt1),
+                                Duration = 3
+                            })
+                        end
+                        
+                        if amt3 > 0 then
+                            ItemsRE:FireServer("UseItem", {ItemId = "LuckPotion3", Amount = math.min(5, amt3)})
+                        elseif amt2 > 0 then
+                            ItemsRE:FireServer("UseItem", {ItemId = "LuckPotion2", Amount = math.min(5, amt2)})
+                        elseif amt1 > 0 then
+                            ItemsRE:FireServer("UseItem", {ItemId = "LuckPotion1", Amount = math.min(5, amt1)})
                         end
                     end
                     task.wait(2)
