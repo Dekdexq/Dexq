@@ -193,6 +193,47 @@ local function findCardFolder()
     return false
 end
 
+local function SendWebhook(url, rarity, mutation)
+    local req = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+    if not req then return end
+    
+    local data = {
+        ["content"] = "",
+        ["embeds"] = {
+            {
+                ["title"] = "🎉 Card Bought!",
+                ["description"] = "Successfully bought a card matching your criteria.",
+                ["type"] = "rich",
+                ["color"] = 5579688,
+                ["fields"] = {
+                    {
+                        ["name"] = "Rarity",
+                        ["value"] = tostring(rarity),
+                        ["inline"] = true
+                    },
+                    {
+                        ["name"] = "Mutation",
+                        ["value"] = tostring(mutation),
+                        ["inline"] = true
+                    }
+                },
+                ["timestamp"] = DateTime.now():ToIsoDate()
+            }
+        }
+    }
+    
+    pcall(function()
+        req({
+            Url = url,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = game:GetService("HttpService"):JSONEncode(data)
+        })
+    end)
+end
+
 -- Main heartbeat loop targeting ProximityPrompts instantly without queue delays
 local function instantBuyLoop()
     if not getgenv().AutoBuyCards then return end
@@ -248,6 +289,16 @@ local function instantBuyLoop()
                             prompt.MaxActivationDistance = 99999
                             fireproximityprompt(prompt)
                         end)
+                        
+                        if getgenv().DiscordWebhook and getgenv().DiscordWebhook ~= "" then
+                            if not getgenv().NotifiedCards then getgenv().NotifiedCards = {} end
+                            if not getgenv().NotifiedCards[prompt] then
+                                getgenv().NotifiedCards[prompt] = true
+                                task.spawn(function()
+                                    SendWebhook(getgenv().DiscordWebhook, cardRarity, cardMutation)
+                                end)
+                            end
+                        end
                     end
                 else
                     -- Mark the card as rejected so the spawner doesn't wait for it
@@ -435,6 +486,16 @@ local function LoadMainConfig()
 end
 LoadMainConfig()
 
+getgenv().DiscordWebhook = ""
+local WebhookInput = MiscTab:Input({
+    Title = "Discord Webhook URL",
+    Desc = "Enter your webhook URL to get notifications when a card is bought",
+    PlaceholderText = "https://discord.com/api/webhooks/...",
+    Callback = function(text)
+        getgenv().DiscordWebhook = text
+    end
+})
+
 MiscTab:Keybind({
     Title = "Toggle UI Key",
     Desc = "Press to hide or show the menu",
@@ -468,7 +529,8 @@ local function SaveConfig(name)
         AutoSpawn = getgenv().AutoSpawnPack or false,
         AutoBuy = getgenv().AutoBuyCards or false,
         AntiAfk = getgenv().AntiAfkState or false,
-        AutoUseLuck = getgenv().AutoUseLuck or false
+        AutoUseLuck = getgenv().AutoUseLuck or false,
+        Webhook = getgenv().DiscordWebhook or ""
     }
     if writefile then
         pcall(function()
@@ -498,6 +560,9 @@ local function LoadConfig(name)
             safeToggleSet(AutoBuyToggle, data.AutoBuy or false)
             safeToggleSet(AntiAfkToggle, data.AntiAfk or false)
             safeToggleSet(AutoUseLuckToggle, data.AutoUseLuck or false)
+            
+            getgenv().DiscordWebhook = data.Webhook or ""
+            pcall(function() WebhookInput:SetValue(getgenv().DiscordWebhook) end)
             
             
             if RarityDropdown then
