@@ -191,9 +191,76 @@ local function findCardFolder()
     return false
 end
 
+local function GetAllInventorySummary()
+    local player = game:GetService("Players").LocalPlayer
+    local inventory = {}
+    
+    local function scanFolder(folder)
+        if not folder then return end
+        for _, item in ipairs(folder:GetChildren()) do
+            if item:IsA("Tool") then
+                local rarityAttr = item:GetAttribute("Rarity")
+                local cardNameAttr = item:GetAttribute("CardName")
+                local groupKey = rarityAttr or cardNameAttr or item.Name
+                
+                -- try to read from StringValues if attributes are missing
+                if not item:GetAttribute("Rarity") and item:FindFirstChild("Rarity") and item.Rarity:IsA("StringValue") then
+                    groupKey = item.Rarity.Value
+                end
+                
+                local mutation = item:GetAttribute("Mutation") or "Normal"
+                if not item:GetAttribute("Mutation") and item:FindFirstChild("Mutation") and item.Mutation:IsA("StringValue") then
+                    mutation = item.Mutation.Value
+                end
+                
+                if not string.find(string.lower(item.Name), "box") and groupKey ~= "Box" then
+                    if not inventory[groupKey] then
+                        inventory[groupKey] = {}
+                    end
+                    if not inventory[groupKey][mutation] then
+                        inventory[groupKey][mutation] = 0
+                    end
+                    inventory[groupKey][mutation] = inventory[groupKey][mutation] + 1
+                end
+            end
+        end
+    end
+    
+    pcall(function()
+        scanFolder(player:FindFirstChild("Backpack"))
+        if player.Character then
+            scanFolder(player.Character)
+        end
+    end)
+    
+    local resultLines = {}
+    for key, mutations in pairs(inventory) do
+        local mutStrings = {}
+        for mut, count in pairs(mutations) do
+            table.insert(mutStrings, mut .. " x" .. tostring(count))
+        end
+        table.insert(resultLines, tostring(key) .. ": " .. table.concat(mutStrings, " | "))
+    end
+    
+    if #resultLines > 0 then
+        local fullText = table.concat(resultLines, "\n")
+        if string.len(fullText) > 1000 then
+            return string.sub(fullText, 1, 1000) .. "..."
+        end
+        return fullText
+    else
+        return "None"
+    end
+end
+
 local function SendWebhook(url, rarity, mutation)
     local req = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
     if not req then return end
+    
+    local inventoryText = "Unknown"
+    pcall(function()
+        inventoryText = GetAllInventorySummary()
+    end)
     
     local data = {
         ["content"] = "",
@@ -213,6 +280,11 @@ local function SendWebhook(url, rarity, mutation)
                         ["name"] = "Mutation",
                         ["value"] = tostring(mutation),
                         ["inline"] = true
+                    },
+                    {
+                        ["name"] = "Full Inventory",
+                        ["value"] = inventoryText,
+                        ["inline"] = false
                     }
                 },
                 ["timestamp"] = DateTime.now():ToIsoDate()
