@@ -25,7 +25,10 @@ local PotionTab = Window:Tab({
 	Title = "Potion",
 	Icon = "lucide:flask-conical",
 })
-
+local RaidTab = Window:Tab({
+	Title = "Raid",
+	Icon = "lucide:swords",
+})
 local TradeTab = Window:Tab({
 	Title = "Trade",
 	Icon = "lucide:arrow-right-left",
@@ -526,19 +529,12 @@ local AutoCarryToggle = MainTab:Toggle({
 							local txt = (prompt.ActionText .. " " .. prompt.ObjectText .. " " .. prompt.Name):lower()
 							if txt:find("carry") then
 								pcall(function()
-									local targetPos
-									if prompt.Parent:IsA("BasePart") then
-										targetPos = prompt.Parent.Position
-									elseif prompt.Parent:IsA("Attachment") then
-										targetPos = prompt.Parent.WorldPosition
-									elseif prompt.Parent:IsA("Model") and prompt.Parent.PrimaryPart then
-										targetPos = prompt.Parent.PrimaryPart.Position
-									end
 									local originalCFrame
-									if hrp and targetPos then
+									if hrp then
 										originalCFrame = hrp.CFrame
-										hrp.CFrame = CFrame.new(targetPos) + Vector3.new(0, 3, 0)
-										task.wait(0.2)
+										hrp.CFrame = CFrame.new(-84.86966705322266, 4.899999141693115, -183.0749969482422)
+										hrp.Velocity = Vector3.new(0, 0, 0)
+										task.wait(1.2)
 									end
 									prompt.RequiresLineOfSight = false
 									prompt.MaxActivationDistance = 99999
@@ -616,8 +612,9 @@ local AutoSellBoxToggle = MainTab:Toggle({
 								if prompt then
 									pcall(function()
 										local originalCFrame = hrp.CFrame
-										hrp.CFrame = sellPart.CFrame + Vector3.new(0, 3, 0)
-										task.wait(0.15)
+										hrp.CFrame = CFrame.new(-42.397342681884766, 4.69999885559082, -172.2036895751953)
+										hrp.Velocity = Vector3.new(0, 0, 0)
+										task.wait(1.2)
 										prompt.RequiresLineOfSight = false
 										prompt.MaxActivationDistance = 99999
 										fireproximityprompt(prompt)
@@ -790,7 +787,657 @@ setupPotionToggle("Luck", "PotionLuck", "LuckPotion")
 setupPotionToggle("Cash", "PotionCash", "CashPotion")
 setupPotionToggle("Mutation", "PotionMutation", "MutationPotion")
 setupPotionToggle("Production", "PotionProduction", "ProductionPotion")
-
+getgenv().AutoTower = false
+local AutoTowerToggle = RaidTab:Toggle({
+	Title = "Auto Infinity Tower",
+	Value = getgenv().AutoTower,
+	Callback = function(state)
+		getgenv().AutoTower = state
+		if not state then
+			local cam = workspace.CurrentCamera
+			local character = game:GetService("Players").LocalPlayer.Character
+			if cam and getgenv().TowerSavedCamCF then
+				cam.CameraType = Enum.CameraType.Custom
+				if character and character:FindFirstChild("Humanoid") then
+					cam.CameraSubject = character.Humanoid
+				end
+				getgenv().TowerSavedCamCF = nil
+			end
+			if getgenv().TowerOriginalCFrame and character then
+				character:PivotTo(getgenv().TowerOriginalCFrame)
+				getgenv().TowerOriginalCFrame = nil
+			end
+		end
+		if state then
+			task.spawn(function()
+				while getgenv().AutoTower do
+					local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+					if playerGui then
+						local equipBtn, battleBtn, nextBtn, playBtn, openBtn, autoReplayBtn, hideBattleBtn, showBattleBtn
+						local function isGuiVisible(gui)
+							if not gui then
+								return false
+							end
+							if gui:IsA("GuiObject") and not gui.Visible then
+								return false
+							end
+							local current = gui.Parent
+							while current and current:IsA("GuiObject") do
+								if not current.Visible then
+									return false
+								end
+								current = current.Parent
+							end
+							if current and current:IsA("ScreenGui") then
+								return current.Enabled
+							end
+							return true
+						end
+						for _, v in ipairs(playerGui:GetDescendants()) do
+							if (v:IsA("TextButton") or v:IsA("TextLabel")) and v.Text then
+								local text = string.upper(string.match(v.Text, "^%s*(.-)%s*$") or "")
+								if text == "EQUIP BEST" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										equipBtn = btn
+									end
+								elseif text == "BATTLE" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										battleBtn = btn
+									end
+								elseif text == "NEXT" or text == "NEXT FLOOR" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										nextBtn = btn
+									end
+								elseif text == "PLAY" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										playBtn = btn
+									end
+								elseif text == "AUTO REPLAY" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										autoReplayBtn = btn
+									end
+								elseif text == "HIDE BATTLE" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										hideBattleBtn = btn
+									end
+								elseif text == "SHOW BATTLE" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										showBattleBtn = btn
+									end
+								elseif string.find(text, "OPEN INFINITY TOWER") then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn then
+										openBtn = btn
+									end
+								end
+							end
+						end
+						local openPrompt
+						for _, p in ipairs(workspace:GetDescendants()) do
+							if p:IsA("ProximityPrompt") then
+								local pText = string.upper(p.ActionText .. " " .. p.ObjectText)
+								if
+									string.find(pText, "OPEN INFINITY TOWER") or string.find(pText, "INFINITY TOWER")
+								then
+									openPrompt = p
+									break
+								end
+							end
+						end
+						local function fireButton(btn)
+							if not btn then
+								return
+							end
+							pcall(function()
+								local fired = false
+								if getconnections then
+									for _, conn in pairs(getconnections(btn.Activated)) do
+										pcall(function()
+											conn:Fire()
+										end)
+										fired = true
+									end
+									for _, conn in pairs(getconnections(btn.MouseButton1Click)) do
+										pcall(function()
+											conn:Fire()
+										end)
+										fired = true
+									end
+									for _, conn in pairs(getconnections(btn.MouseButton1Down)) do
+										pcall(function()
+											conn:Fire()
+										end)
+										fired = true
+									end
+								end
+								if not fired then
+									local vim = game:GetService("VirtualInputManager")
+									local absPos = btn.AbsolutePosition
+									local absSize = btn.AbsoluteSize
+									local center = absPos + (absSize / 2)
+									vim:SendMouseButtonEvent(center.X, center.Y + 36, 0, true, game, 1)
+									task.wait(0.1)
+									vim:SendMouseButtonEvent(center.X, center.Y + 36, 0, false, game, 1)
+								end
+							end)
+						end
+						local inBattle = equipBtn or battleBtn or autoReplayBtn or showBattleBtn
+						if openPrompt and not inBattle then
+							pcall(function()
+								local hrp = game:GetService("Players").LocalPlayer.Character
+									and game:GetService("Players").LocalPlayer.Character
+										:FindFirstChild("HumanoidRootPart")
+								if hrp then
+									local targetPos
+									if openPrompt.Parent:IsA("BasePart") then
+										targetPos = openPrompt.Parent.Position
+									elseif openPrompt.Parent:IsA("Attachment") then
+										targetPos = openPrompt.Parent.WorldPosition
+									elseif openPrompt.Parent:IsA("Model") and openPrompt.Parent.PrimaryPart then
+										targetPos = openPrompt.Parent.PrimaryPart.Position
+									end
+									if targetPos then
+										local dist = (hrp.Position - targetPos).Magnitude
+										if dist > 15 then
+											local character = game:GetService("Players").LocalPlayer.Character
+											if not getgenv().TowerOriginalCFrame then
+												getgenv().TowerOriginalCFrame = character:GetPivot()
+											end
+											local cam = workspace.CurrentCamera
+											if cam then
+												getgenv().TowerSavedCamCF = cam.CFrame
+												cam.CameraType = Enum.CameraType.Scriptable
+											end
+											character:PivotTo(CFrame.new(targetPos) + Vector3.new(0, 3, 0))
+											task.wait(0.1)
+										end
+									end
+								end
+								openPrompt.RequiresLineOfSight = false
+								openPrompt.MaxActivationDistance = 99999
+								fireproximityprompt(openPrompt)
+							end)
+							task.wait(0.1)
+						end
+						if openBtn and not (equipBtn or battleBtn) then
+							fireButton(openBtn)
+							task.wait(0.1)
+						end
+						if equipBtn then
+							fireButton(equipBtn)
+							task.wait(0.1)
+						end
+						if battleBtn then
+							fireButton(battleBtn)
+							task.wait(0.2)
+							local character = game:GetService("Players").LocalPlayer.Character
+							if getgenv().TowerOriginalCFrame and character then
+								character:PivotTo(getgenv().TowerOriginalCFrame)
+								getgenv().TowerOriginalCFrame = nil
+								local cam = workspace.CurrentCamera
+								local char = game:GetService("Players").LocalPlayer.Character
+								if cam and getgenv().TowerSavedCamCF then
+									cam.CameraType = Enum.CameraType.Custom
+									if char and char:FindFirstChild("Humanoid") then
+										cam.CameraSubject = char.Humanoid
+									end
+									getgenv().TowerSavedCamCF = nil
+								end
+							end
+						end
+						if autoReplayBtn then
+							local color = autoReplayBtn.BackgroundColor3
+							if
+								autoReplayBtn.BackgroundTransparency > 0.5
+								and autoReplayBtn.Parent
+								and autoReplayBtn.Parent:IsA("GuiObject")
+							then
+								color = autoReplayBtn.Parent.BackgroundColor3
+							end
+							if
+								autoReplayBtn:IsA("ImageButton")
+								and autoReplayBtn.ImageColor3 ~= Color3.new(1, 1, 1)
+							then
+								color = autoReplayBtn.ImageColor3
+							end
+							local isGreen = (color.G > color.R + 0.1)
+							if isGreen then
+								getgenv().AutoReplayToggled = true
+							elseif not getgenv().AutoReplayToggled then
+								fireButton(autoReplayBtn)
+								getgenv().AutoReplayToggled = true
+								task.wait(0.2)
+							end
+						end
+						if not (autoReplayBtn or showBattleBtn or hideBattleBtn) then
+							getgenv().AutoReplayToggled = false
+						end
+						if autoReplayBtn or showBattleBtn then
+							local character = game:GetService("Players").LocalPlayer.Character
+							if getgenv().TowerOriginalCFrame and character then
+								character:PivotTo(getgenv().TowerOriginalCFrame)
+								getgenv().TowerOriginalCFrame = nil
+								local cam = workspace.CurrentCamera
+								local char = game:GetService("Players").LocalPlayer.Character
+								if cam and getgenv().TowerSavedCamCF then
+									cam.CameraType = Enum.CameraType.Custom
+									if char and char:FindFirstChild("Humanoid") then
+										cam.CameraSubject = char.Humanoid
+									end
+									getgenv().TowerSavedCamCF = nil
+								end
+							end
+						end
+						if hideBattleBtn then
+							fireButton(hideBattleBtn)
+							task.wait(0.2)
+						end
+						if nextBtn then
+							fireButton(nextBtn)
+							task.wait(0.2)
+						end
+						if playBtn then
+							fireButton(playBtn)
+							task.wait(0.2)
+						end
+					end
+					task.wait(0.2)
+				end
+			end)
+		end
+	end,
+})
+getgenv().BossRaidDifficulty = "NIGHTMARE"
+local BossRaidDiffDropdown = RaidTab:Dropdown({
+	Title = "Boss Raid Difficulty",
+	Value = "NIGHTMARE",
+	Values = { "EASY", "MEDIUM", "HARD", "NIGHTMARE" },
+	Callback = function(Value)
+		getgenv().BossRaidDifficulty = Value
+	end,
+})
+getgenv().AutoBossRaid = false
+local AutoBossRaidToggle = RaidTab:Toggle({
+	Title = "Auto Boss Raid",
+	Value = getgenv().AutoBossRaid,
+	Callback = function(state)
+		getgenv().AutoBossRaid = state
+		if state then
+			getgenv().AutoTower = false
+			task.spawn(function()
+				while getgenv().AutoBossRaid do
+					local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+					if playerGui then
+						local equipBtn, battleBtn, diffBtn, autoReplayBtn, showBattleBtn, hideBattleBtn, nextBtn, playBtn
+						local function isGuiVisible(gui)
+							if not gui then
+								return false
+							end
+							if gui:IsA("GuiObject") and not gui.Visible then
+								return false
+							end
+							local current = gui.Parent
+							while current and current:IsA("GuiObject") do
+								if not current.Visible then
+									return false
+								end
+								current = current.Parent
+							end
+							if current and current:IsA("ScreenGui") then
+								return current.Enabled
+							end
+							return true
+						end
+						local function fireButton(btn)
+							pcall(function()
+								local fired = false
+								if btn.Parent:IsA("ProximityPrompt") then
+									return
+								end
+								for _, c in ipairs(getconnections(btn.MouseButton1Click)) do
+									c:Fire()
+									fired = true
+								end
+								if not fired then
+									for _, c in ipairs(getconnections(btn.MouseButton1Down)) do
+										c:Fire()
+										fired = true
+									end
+									for _, c in ipairs(getconnections(btn.MouseButton1Up)) do
+										c:Fire()
+										fired = true
+									end
+									for _, c in ipairs(getconnections(btn.Activated)) do
+										c:Fire()
+										fired = true
+									end
+								end
+								if not fired then
+									local vim = game:GetService("VirtualInputManager")
+									local absPos = btn.AbsolutePosition
+									local absSize = btn.AbsoluteSize
+									local center = absPos + (absSize / 2)
+									vim:SendMouseButtonEvent(center.X, center.Y + 36, 0, true, game, 1)
+									task.wait(0.1)
+									vim:SendMouseButtonEvent(center.X, center.Y + 36, 0, false, game, 1)
+								end
+							end)
+						end
+						local alreadyFought = false
+						for _, v in ipairs(playerGui:GetDescendants()) do
+							if (v:IsA("TextButton") or v:IsA("TextLabel")) and v.Text then
+								local text = string.upper(string.match(v.Text, "^%s*(.-)%s*$") or "")
+								if string.find(text, "ALREADY FOUGHT THE BOSS") and isGuiVisible(v) then
+									alreadyFought = true
+								end
+								if text == "EQUIP BEST" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										equipBtn = btn
+									end
+								elseif text == "BATTLE" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										battleBtn = btn
+									end
+								elseif text == getgenv().BossRaidDifficulty then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										diffBtn = btn
+									end
+								elseif text == "AUTO REPLAY" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										autoReplayBtn = btn
+									end
+								elseif text == "SHOW BATTLE" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										showBattleBtn = btn
+									end
+								elseif text == "HIDE BATTLE" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										hideBattleBtn = btn
+									end
+								elseif text == "NEXT" or text == "NEXT FLOOR" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										nextBtn = btn
+									end
+								elseif text == "PLAY" then
+									local btn = v:IsA("TextButton") and v
+										or v:FindFirstAncestorWhichIsA("TextButton")
+										or v:FindFirstAncestorWhichIsA("ImageButton")
+									if btn and isGuiVisible(btn) then
+										playBtn = btn
+									end
+								end
+							end
+						end
+						if alreadyFought then
+							getgenv().AutoBossRaid = false
+							if AutoBossRaidToggle and AutoBossRaidToggle.Set then
+								pcall(function()
+									AutoBossRaidToggle:Set(false)
+								end)
+							end
+							if WindUI and WindUI.Notify then
+								WindUI:Notify({
+									Title = "Boss Raid",
+									Content = "You already fought the boss this hour! Auto Boss Raid stopped.",
+									Duration = 5,
+								})
+							end
+							local character = game:GetService("Players").LocalPlayer.Character
+							if getgenv().BossOriginalCFrame and character then
+								character:PivotTo(getgenv().BossOriginalCFrame)
+								getgenv().BossOriginalCFrame = nil
+							end
+							continue
+						end
+						local inBattle = equipBtn or battleBtn or autoReplayBtn or showBattleBtn
+						if not inBattle then
+							local bossPrompt
+							local portalPrompt
+							local cooldownText = nil
+							for _, p in ipairs(workspace:GetDescendants()) do
+								if p:IsA("TextLabel") or p:IsA("TextButton") then
+									local match = string.match(p.Text, "[Oo]pen in %d+:%d+:%d+") or string.match(p.Text, "[Oo]pen in %d+:%d+")
+									if match then
+										cooldownText = match
+									end
+								end
+								if p:IsA("ProximityPrompt") then
+									local pText = string.upper(
+										p.ActionText .. " " .. p.ObjectText .. " " .. (p.Parent and p.Parent.Name or "")
+									)
+									if string.find(pText, "BOSS RAID") and string.find(pText, "TELEPORT") then
+										portalPrompt = p
+									elseif
+										not string.find(pText, "SHOP")
+										and not string.find(pText, "RETURN")
+										and not string.find(pText, "BACK")
+										and not string.find(pText, "TELEPORT")
+									then
+										if
+											string.find(pText, "TITAN")
+											or string.find(pText, "BOSS")
+											or string.find(pText, "RAID")
+											or string.find(pText, "FIGHT")
+										then
+											bossPrompt = p
+										end
+									end
+								end
+							end
+							local targetPrompt = bossPrompt or portalPrompt
+							if cooldownText then
+								if not getgenv().LastBossCooldownNotify or (tick() - getgenv().LastBossCooldownNotify > 60) then
+									if WindUI and WindUI.Notify then
+										WindUI:Notify({ Title = "Auto Boss Raid", Content = "Waiting: " .. cooldownText, Duration = 5 })
+									end
+									getgenv().LastBossCooldownNotify = tick()
+								end
+								local character = game:GetService("Players").LocalPlayer.Character
+								if getgenv().BossOriginalCFrame and character then
+									character:PivotTo(getgenv().BossOriginalCFrame)
+									getgenv().BossOriginalCFrame = nil
+								end
+								task.wait(1)
+							elseif targetPrompt then
+								pcall(function()
+									local hrp = game:GetService("Players").LocalPlayer.Character
+										and game:GetService("Players").LocalPlayer.Character
+											:FindFirstChild("HumanoidRootPart")
+									if hrp then
+										local targetPos
+										if targetPrompt.Parent:IsA("BasePart") then
+											targetPos = targetPrompt.Parent.Position
+										elseif targetPrompt.Parent:IsA("Attachment") then
+											targetPos = targetPrompt.Parent.WorldPosition
+										elseif targetPrompt.Parent:IsA("Model") and targetPrompt.Parent.PrimaryPart then
+											targetPos = targetPrompt.Parent.PrimaryPart.Position
+										end
+										if targetPos then
+											local character = game:GetService("Players").LocalPlayer.Character
+											if (hrp.Position - targetPos).Magnitude > 15 then
+												if not getgenv().BossOriginalCFrame then
+													getgenv().BossOriginalCFrame = character:GetPivot()
+												end
+												character:PivotTo(CFrame.new(targetPos) + Vector3.new(0, 3, 0))
+												task.wait(0.1)
+											end
+										end
+									end
+									targetPrompt.RequiresLineOfSight = false
+									targetPrompt.MaxActivationDistance = 99999
+									fireproximityprompt(targetPrompt)
+								end)
+								task.wait(0.5)
+								pcall(function()
+									local hrp = game:GetService("Players").LocalPlayer.Character and game:GetService("Players").LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+									if hrp and targetPrompt and targetPrompt.Parent then
+										local targetPos
+										if targetPrompt.Parent:IsA("BasePart") then targetPos = targetPrompt.Parent.Position
+										elseif targetPrompt.Parent:IsA("Attachment") then targetPos = targetPrompt.Parent.WorldPosition
+										elseif targetPrompt.Parent:IsA("Model") and targetPrompt.Parent.PrimaryPart then targetPos = targetPrompt.Parent.PrimaryPart.Position end
+										
+										if targetPos and (hrp.Position - targetPos).Magnitude < 30 then
+											task.wait(10)
+										end
+									end
+								end)
+							end
+						end
+						if diffBtn and not (autoReplayBtn or showBattleBtn) then
+							fireButton(diffBtn)
+							task.wait(0.1)
+						end
+						if equipBtn then
+							fireButton(equipBtn)
+							task.wait(0.1)
+						end
+						if battleBtn then
+							fireButton(battleBtn)
+							task.wait(0.2)
+							local character = game:GetService("Players").LocalPlayer.Character
+							if getgenv().BossOriginalCFrame and character then
+								character:PivotTo(getgenv().BossOriginalCFrame)
+								getgenv().BossOriginalCFrame = nil
+							end
+						end
+						if autoReplayBtn then
+							local color = autoReplayBtn.BackgroundColor3
+							if
+								autoReplayBtn.BackgroundTransparency > 0.5
+								and autoReplayBtn.Parent
+								and autoReplayBtn.Parent:IsA("GuiObject")
+							then
+								color = autoReplayBtn.Parent.BackgroundColor3
+							end
+							if
+								autoReplayBtn:IsA("ImageButton")
+								and autoReplayBtn.ImageColor3 ~= Color3.new(1, 1, 1)
+							then
+								color = autoReplayBtn.ImageColor3
+							end
+							local isGreen = (color.G > color.R + 0.1)
+							if isGreen then
+								getgenv().AutoReplayToggledBoss = true
+							elseif not getgenv().AutoReplayToggledBoss then
+								fireButton(autoReplayBtn)
+								getgenv().AutoReplayToggledBoss = true
+								task.wait(0.2)
+							end
+						end
+						if not (autoReplayBtn or showBattleBtn or hideBattleBtn) then
+							getgenv().AutoReplayToggledBoss = false
+						end
+						if autoReplayBtn or showBattleBtn then
+							local character = game:GetService("Players").LocalPlayer.Character
+							if getgenv().BossOriginalCFrame and character then
+								character:PivotTo(getgenv().BossOriginalCFrame)
+								getgenv().BossOriginalCFrame = nil
+							end
+						end
+						if hideBattleBtn then
+							fireButton(hideBattleBtn)
+							task.wait(0.2)
+						end
+						if nextBtn then
+							fireButton(nextBtn)
+							task.wait(0.2)
+						end
+						if playBtn then
+							fireButton(playBtn)
+							task.wait(0.2)
+						end
+					end
+					task.wait(0.2)
+				end
+			end)
+		else
+			local character = game:GetService("Players").LocalPlayer.Character
+			if getgenv().BossOriginalCFrame and character then
+				character:PivotTo(getgenv().BossOriginalCFrame)
+				getgenv().BossOriginalCFrame = nil
+			end
+		end
+	end,
+})
+RaidTab:Button({
+	Title = "Check Boss Raid Cooldown",
+	Callback = function()
+		local foundTimer = false
+		pcall(function()
+			for _, v in ipairs(workspace:GetDescendants()) do
+				if v:IsA("TextLabel") or v:IsA("TextButton") then
+					if string.find(v.Text, "%d+:%d+:%d+") or string.find(v.Text, "%d+:%d+") then
+						local lowerText = string.lower(v.Text)
+						if string.find(lowerText, "boss") or string.find(lowerText, "raid") then
+							if WindUI and WindUI.Notify then
+								WindUI:Notify({ Title = "Boss Status", Content = "Timer found: " .. v.Text, Duration = 5 })
+							end
+							foundTimer = true
+							break
+						elseif v.Parent and (string.find(string.lower(v.Parent.Name), "boss") or string.find(string.lower(v.Parent.Name), "raid") or string.find(string.lower(v.Parent.Name), "timer")) then
+							if WindUI and WindUI.Notify then
+								WindUI:Notify({ Title = "Boss Status", Content = "Timer found: " .. v.Text, Duration = 5 })
+							end
+							foundTimer = true
+							break
+						end
+					end
+				end
+			end
+		end)
+		if not foundTimer then
+			local currentMin = tonumber(os.date("%M"))
+			local minToNextHour = 60 - currentMin
+			if WindUI and WindUI.Notify then
+				WindUI:Notify({ Title = "Boss Status", Content = "Estimated Cooldown: " .. minToNextHour .. " mins (Check portal for exact)", Duration = 5 })
+			end
+		end
+	end,
+})
 local function GetPlayerNames()
 	local names = {}
 	for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
@@ -930,7 +1577,6 @@ TradeTab:Button({
 		end
 	end,
 })
-
 getgenv().AutoGiftCards = false
 TradeTab:Toggle({
 	Title = "Auto Trade",
@@ -952,14 +1598,42 @@ TradeTab:Toggle({
 							local localChar = localPlayer.Character
 							if localChar and localChar:FindFirstChild("Humanoid") then
 								local function getGiftableTool()
-									local backpack = localPlayer:FindFirstChild("Backpack")
-									local tools = {}
-									if backpack then
-										for _, t in ipairs(backpack:GetChildren()) do table.insert(tools, t) end
+									local function isSelected(t)
+										if not next(getgenv().SelectedTradeCards) then return true end -- if nothing selected, trade all
+										local rarityAttr = t:GetAttribute("Rarity") or t:GetAttribute("CardGrade")
+										if not rarityAttr and t:FindFirstChild("Rarity") and t.Rarity:IsA("StringValue") then
+											rarityAttr = t.Rarity.Value
+										end
+										if not rarityAttr then rarityAttr = "Unknown" end
+
+										local mutation = t:GetAttribute("Mutation") or t:GetAttribute("CardMutation") or "Normal"
+										if not t:GetAttribute("Mutation") and not t:GetAttribute("CardMutation") and t:FindFirstChild("Mutation") and t.Mutation:IsA("StringValue") then
+											mutation = t.Mutation.Value
+										end
+										local key = tostring(rarityAttr) .. " | " .. tostring(mutation)
+										for selectedText, _ in pairs(getgenv().SelectedTradeCards) do
+											if selectedText:find(key, 1, true) then
+												return true
+											end
+										end
+										return false
 									end
-									for _, t in ipairs(localChar:GetChildren()) do table.insert(tools, t) end
-									
-									for _, t in ipairs(tools) do
+
+									local backpack = localPlayer:FindFirstChild("Backpack")
+									if backpack then
+										for _, t in ipairs(backpack:GetChildren()) do
+											if
+												t:IsA("Tool")
+												and (
+													t:GetAttribute("CardName") ~= nil
+													or t:GetAttribute("TemplateName") ~= nil
+												)
+											then
+												if isSelected(t) then return t end
+											end
+										end
+									end
+									for _, t in ipairs(localChar:GetChildren()) do
 										if
 											t:IsA("Tool")
 											and (
@@ -967,33 +1641,7 @@ TradeTab:Toggle({
 												or t:GetAttribute("TemplateName") ~= nil
 											)
 										then
-											local r = t:GetAttribute("Rarity") or t:GetAttribute("CardGrade")
-											if not r and t:FindFirstChild("Rarity") and t.Rarity:IsA("StringValue") then r = t.Rarity.Value end
-											if not r then r = "Unknown" end
-											
-											local m = t:GetAttribute("Mutation") or t:GetAttribute("CardMutation") or "Normal"
-											if not t:GetAttribute("Mutation") and not t:GetAttribute("CardMutation") and t:FindFirstChild("Mutation") and t.Mutation:IsA("StringValue") then m = t.Mutation.Value end
-											
-											local baseStr = tostring(r) .. " | " .. tostring(m)
-											
-											local hasSelection = false
-											local isSelected = false
-											if getgenv().SelectedTradeCards then
-												for k, v in pairs(getgenv().SelectedTradeCards) do
-													if v then
-														hasSelection = true
-														local baseK = k:match("^(.-) %(x%d+%)$") or k
-														if baseK == baseStr then
-															isSelected = true
-															break
-														end
-													end
-												end
-											end
-											
-											if isSelected or not hasSelection then
-												return t
-											end
+											if isSelected(t) then return t end
 										end
 									end
 									return nil
