@@ -1,6 +1,6 @@
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 local Window = WindUI:CreateWindow({
-	Title = "Dexq",
+	Title = "ZIIQ",
 	Author = "Anime Card Farm",
 	Folder = "DexqUI",
 	Size = UDim2.fromOffset(480, 310),
@@ -228,6 +228,9 @@ local RaritiesList = {
 	"VIP",
 	"Event",
 	"Limited",
+	"Blaze",
+	"Devour",
+	"Conquest",
 }
 getgenv().SelectedRarities = {}
 local RarityDropdown = MainTab:Dropdown({
