@@ -852,6 +852,82 @@ TradeTab:Button({
 		end
 	end,
 })
+
+local function GetInventoryCardsForTrade()
+	local player = game:GetService("Players").LocalPlayer
+	local inventory = {}
+	local function scanFolder(folder)
+		if not folder then return end
+		for _, item in ipairs(folder:GetChildren()) do
+			if item:IsA("Tool") then
+				local isCard = item:GetAttribute("CardName") ~= nil
+				local isPack = item:GetAttribute("TemplateName") ~= nil
+				if isCard or isPack then
+					local rarityAttr = item:GetAttribute("Rarity") or item:GetAttribute("CardGrade")
+					if not rarityAttr and item:FindFirstChild("Rarity") and item.Rarity:IsA("StringValue") then
+						rarityAttr = item.Rarity.Value
+					end
+					if not rarityAttr then rarityAttr = "Unknown" end
+
+					local mutation = item:GetAttribute("Mutation") or item:GetAttribute("CardMutation") or "Normal"
+					if not item:GetAttribute("Mutation") and not item:GetAttribute("CardMutation") and item:FindFirstChild("Mutation") and item.Mutation:IsA("StringValue") then
+						mutation = item.Mutation.Value
+					end
+
+					local key = tostring(rarityAttr) .. " | " .. tostring(mutation)
+					if not inventory[key] then inventory[key] = 0 end
+					inventory[key] = inventory[key] + 1
+				end
+			end
+		end
+	end
+	pcall(function()
+		scanFolder(player:FindFirstChild("Backpack"))
+		if player.Character then scanFolder(player.Character) end
+	end)
+
+	local list = {}
+	for key, count in pairs(inventory) do
+		table.insert(list, key .. " (x" .. tostring(count) .. ")")
+	end
+	if #list == 0 then table.insert(list, "No cards found") end
+	return list
+end
+
+getgenv().SelectedTradeCards = {}
+local TradeCardsDropdown = TradeTab:Dropdown({
+	Title = "Select Cards to Trade",
+	Multi = true,
+	Value = {},
+	Values = GetInventoryCardsForTrade(),
+	Callback = function(Value)
+		getgenv().SelectedTradeCards = {}
+		if type(Value) == "table" then
+			for k, v in pairs(Value) do
+				if type(k) == "number" then
+					getgenv().SelectedTradeCards[v] = true
+				else
+					getgenv().SelectedTradeCards[k] = v
+				end
+			end
+		end
+	end,
+})
+
+TradeTab:Button({
+	Title = "Refresh Inventory Cards",
+	Callback = function()
+		if TradeCardsDropdown and TradeCardsDropdown.Refresh then
+			pcall(function()
+				TradeCardsDropdown:Refresh(GetInventoryCardsForTrade())
+			end)
+		end
+		if WindUI and WindUI.Notify then
+			WindUI:Notify({ Title = "Trade", Content = "Inventory cards refreshed!", Duration = 3 })
+		end
+	end,
+})
+
 getgenv().AutoGiftCards = false
 TradeTab:Toggle({
 	Title = "Auto Trade",
@@ -874,20 +950,13 @@ TradeTab:Toggle({
 							if localChar and localChar:FindFirstChild("Humanoid") then
 								local function getGiftableTool()
 									local backpack = localPlayer:FindFirstChild("Backpack")
+									local tools = {}
 									if backpack then
-										for _, t in ipairs(backpack:GetChildren()) do
-											if
-												t:IsA("Tool")
-												and (
-													t:GetAttribute("CardName") ~= nil
-													or t:GetAttribute("TemplateName") ~= nil
-												)
-											then
-												return t
-											end
-										end
+										for _, t in ipairs(backpack:GetChildren()) do table.insert(tools, t) end
 									end
-									for _, t in ipairs(localChar:GetChildren()) do
+									for _, t in ipairs(localChar:GetChildren()) do table.insert(tools, t) end
+									
+									for _, t in ipairs(tools) do
 										if
 											t:IsA("Tool")
 											and (
@@ -895,7 +964,33 @@ TradeTab:Toggle({
 												or t:GetAttribute("TemplateName") ~= nil
 											)
 										then
-											return t
+											local r = t:GetAttribute("Rarity") or t:GetAttribute("CardGrade")
+											if not r and t:FindFirstChild("Rarity") and t.Rarity:IsA("StringValue") then r = t.Rarity.Value end
+											if not r then r = "Unknown" end
+											
+											local m = t:GetAttribute("Mutation") or t:GetAttribute("CardMutation") or "Normal"
+											if not t:GetAttribute("Mutation") and not t:GetAttribute("CardMutation") and t:FindFirstChild("Mutation") and t.Mutation:IsA("StringValue") then m = t.Mutation.Value end
+											
+											local baseStr = tostring(r) .. " | " .. tostring(m)
+											
+											local hasSelection = false
+											local isSelected = false
+											if getgenv().SelectedTradeCards then
+												for k, v in pairs(getgenv().SelectedTradeCards) do
+													if v then
+														hasSelection = true
+														local baseK = k:match("^(.-) %(x%d+%)$") or k
+														if baseK == baseStr then
+															isSelected = true
+															break
+														end
+													end
+												end
+											end
+											
+											if isSelected or not hasSelection then
+												return t
+											end
 										end
 									end
 									return nil
